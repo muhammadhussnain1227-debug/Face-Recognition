@@ -1,8 +1,6 @@
 import os
-folder_path = r"C:\Users\User\Desktop\YourFolder" 
-
-# Name you want for your images
-person_name = "yourname"  # change this
+folder_path = r"C:\Users\User\Desktop\Projects\Face recognition\dataset\Muhammad Nashib Sajjad"
+person_name = "Muhammad Nashib Sajjad"  # change this
 
 # Get a list of all files in the folder
 files = os.listdir(folder_path)
