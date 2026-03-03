@@ -1,6 +1,6 @@
 import os
-folder_path = r"C:\Users\User\Desktop\Projects\Face recognition\dataset\Muhammad Nashib Sajjad"
-person_name = "Muhammad Nashib Sajjad"  # change this
+folder_path = r"C:\Users\User\Desktop\Projects\Face recognition\dataset\Mohid Hussain"
+person_name = "Mohid Hussain"  # change this
 
 # Get a list of all files in the folder
 files = os.listdir(folder_path)

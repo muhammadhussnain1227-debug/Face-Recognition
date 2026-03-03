@@ -7,15 +7,12 @@ from deepface import DeepFace
 with open("embeddings.pkl", "rb") as f:
     stored_embeddings = pickle.load(f)
 
+
 def find_match(embedding, threshold=0.9):
-    """
-    Compare the given embedding with stored embeddings
-    using L2-normalized Euclidean distance.
-    """
     min_distance = float("inf")
     identity = "Unknown"
 
-    # Normalize the input embedding
+    # Normalize input embedding
     embedding = embedding / np.linalg.norm(embedding)
 
     for data in stored_embeddings:
@@ -28,10 +25,23 @@ def find_match(embedding, threshold=0.9):
             min_distance = distance
             identity = data["name"]
 
+    # Convert distance to confidence score
+    confidence = max(0, 1 - min_distance)
+
     if min_distance < threshold:
-        return identity
+        return identity, confidence
     else:
-        return "Unknown"
+        return "Unknown", confidence
+
+
+# Assign unique colors for identities
+color_map = {}
+
+def get_color(name):
+    if name not in color_map:
+        color_map[name] = tuple(np.random.randint(0, 255, 3).tolist())
+    return color_map[name]
+
 
 # Open webcam
 cap = cv2.VideoCapture(0)
@@ -42,28 +52,47 @@ while True:
         break
 
     try:
-        # Convert frame to RGB for DeepFace
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Detect face and get embeddings
+        # Detect faces with bounding boxes
         results = DeepFace.represent(
             img_path=frame_rgb,
             model_name="Facenet",
-            enforce_detection=False
+            enforce_detection=False,
+            detector_backend="opencv"
         )
 
-        # Handle multiple faces (if any)
-        for face in results:
-            embedding = np.array(face["embedding"])
-            name = find_match(embedding, threshold=0.9)
+        face_count = len(results)
 
-            # Draw label on frame
-            cv2.putText(frame, name, (50, 50),
+        for face in results:
+
+            embedding = np.array(face["embedding"])
+            name, confidence = find_match(embedding)
+
+            # Get bounding box
+            x = face["facial_area"]["x"]
+            y = face["facial_area"]["y"]
+            w = face["facial_area"]["w"]
+            h = face["facial_area"]["h"]
+
+            color = get_color(name)
+
+            # Draw bounding box
+            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
+
+            label = f"{name} ({confidence:.2f})"
+
+            # Draw label above box
+            cv2.putText(frame, label, (x, y-10),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        1, (0, 255, 0), 2)
+                        0.8, color, 2)
+
+        # Show total face count
+        cv2.putText(frame, f"Total Faces: {face_count}", (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1, (0, 255, 255), 2)
 
     except Exception as e:
-        # Debug errors
         print("Error:", e)
 
     cv2.imshow("Face Recognition", frame)
