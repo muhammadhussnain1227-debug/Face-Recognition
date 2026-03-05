@@ -7,8 +7,7 @@ from deepface import DeepFace
 with open("embeddings.pkl", "rb") as f:
     stored_embeddings = pickle.load(f)
 
-
-def find_match(embedding, threshold=0.9):
+def find_match(embedding, threshold=1.1):
     min_distance = float("inf")
     identity = "Unknown"
 
@@ -31,17 +30,18 @@ def find_match(embedding, threshold=0.9):
     else:
         return "Unknown", confidence
 
-
-# Assign unique colors
+# Assign unique colors for identities
 color_map = {}
-
 def get_color(name):
     if name not in color_map:
         color_map[name] = tuple(np.random.randint(50, 255, 3).tolist())
     return color_map[name]
 
-
+# Open webcam
 cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    print("Camera not working!")
+    exit()
 
 while True:
     ret, frame = cap.read()
@@ -51,6 +51,7 @@ while True:
     try:
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
+        # Detect faces with bounding boxes using DeepFace
         results = DeepFace.represent(
             img_path=frame_rgb,
             model_name="Facenet",
@@ -65,6 +66,7 @@ while True:
             embedding = np.array(face["embedding"])
             name, confidence = find_match(embedding)
 
+            # Get bounding box
             x = face["facial_area"]["x"]
             y = face["facial_area"]["y"]
             w = face["facial_area"]["w"]
@@ -72,51 +74,30 @@ while True:
 
             color = get_color(name)
 
-            # Premium bounding box (thicker + smooth)
-            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 3)
-
-            label = f"{name}  {confidence:.2f}"
-
-            # Text background box
-            (tw, th), _ = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
-            )
-
-            cv2.rectangle(frame,
-                          (x, y - th - 15),
-                          (x + tw + 10, y),
-                          color, -1)
-
-            cv2.putText(frame,
-                        label,
-                        (x + 5, y - 7),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (0, 0, 0),
-                        2)
-
-        # ===== PREMIUM TOTAL FACE PANEL =====
-        overlay = frame.copy()
-
-        # Glass effect background
-        cv2.rectangle(overlay, (15, 15), (320, 75), (20, 20, 20), -1)
-        alpha = 0.6
-        frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
-
-        # Neon border
-        cv2.rectangle(frame, (15, 15), (320, 75), (0, 255, 150), 2)
-
-        cv2.putText(frame,
-                    f"Total Faces: {face_count}",
-                    (30, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
-                    (0, 255, 150),
-                    2)
+            # Draw bounding box and label
+            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
+            cv2.putText(frame, f"{name} ({confidence:.2f})", (x, y-10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
     except Exception as e:
-        print("Error:", e)
+        # If DeepFace fails, face_count = 0
+        face_count = 0
+        # print("Error:", e)
 
+    # ======================
+    # Premium overlay panel (0-face logic + stylish UI)
+    # ======================
+    overlay = frame.copy()
+    cv2.rectangle(overlay, (10, 10), (300, 70), (30, 30, 30), -1)
+    frame = cv2.addWeighted(overlay, 0.6, frame, 0.4, 0)
+
+    panel_color = (0, 0, 255) if face_count == 0 else (0, 255, 150)
+    cv2.rectangle(frame, (10, 10), (300, 70), panel_color, 2)
+
+    cv2.putText(frame, f"Total Faces: {face_count}", (25, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, panel_color, 2)
+
+    # Show frame
     cv2.imshow("Face Recognition", frame)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
