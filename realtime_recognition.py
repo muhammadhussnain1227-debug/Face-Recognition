@@ -12,7 +12,6 @@ def find_match(embedding, threshold=0.9):
     min_distance = float("inf")
     identity = "Unknown"
 
-    # Normalize input embedding
     embedding = embedding / np.linalg.norm(embedding)
 
     for data in stored_embeddings:
@@ -25,7 +24,6 @@ def find_match(embedding, threshold=0.9):
             min_distance = distance
             identity = data["name"]
 
-    # Convert distance to confidence score
     confidence = max(0, 1 - min_distance)
 
     if min_distance < threshold:
@@ -34,16 +32,15 @@ def find_match(embedding, threshold=0.9):
         return "Unknown", confidence
 
 
-# Assign unique colors for identities
+# Assign unique colors
 color_map = {}
 
 def get_color(name):
     if name not in color_map:
-        color_map[name] = tuple(np.random.randint(0, 255, 3).tolist())
+        color_map[name] = tuple(np.random.randint(50, 255, 3).tolist())
     return color_map[name]
 
 
-# Open webcam
 cap = cv2.VideoCapture(0)
 
 while True:
@@ -54,7 +51,6 @@ while True:
     try:
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Detect faces with bounding boxes
         results = DeepFace.represent(
             img_path=frame_rgb,
             model_name="Facenet",
@@ -69,7 +65,6 @@ while True:
             embedding = np.array(face["embedding"])
             name, confidence = find_match(embedding)
 
-            # Get bounding box
             x = face["facial_area"]["x"]
             y = face["facial_area"]["y"]
             w = face["facial_area"]["w"]
@@ -77,20 +72,47 @@ while True:
 
             color = get_color(name)
 
-            # Draw bounding box
-            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
+            # Premium bounding box (thicker + smooth)
+            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 3)
 
-            label = f"{name} ({confidence:.2f})"
+            label = f"{name}  {confidence:.2f}"
 
-            # Draw label above box
-            cv2.putText(frame, label, (x, y-10),
+            # Text background box
+            (tw, th), _ = cv2.getTextSize(
+                label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
+            )
+
+            cv2.rectangle(frame,
+                          (x, y - th - 15),
+                          (x + tw + 10, y),
+                          color, -1)
+
+            cv2.putText(frame,
+                        label,
+                        (x + 5, y - 7),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.8, color, 2)
+                        0.7,
+                        (0, 0, 0),
+                        2)
 
-        # Show total face count
-        cv2.putText(frame, f"Total Faces: {face_count}", (20, 40),
+        # ===== PREMIUM TOTAL FACE PANEL =====
+        overlay = frame.copy()
+
+        # Glass effect background
+        cv2.rectangle(overlay, (15, 15), (320, 75), (20, 20, 20), -1)
+        alpha = 0.6
+        frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+
+        # Neon border
+        cv2.rectangle(frame, (15, 15), (320, 75), (0, 255, 150), 2)
+
+        cv2.putText(frame,
+                    f"Total Faces: {face_count}",
+                    (30, 60),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    1, (0, 255, 255), 2)
+                    1,
+                    (0, 255, 150),
+                    2)
 
     except Exception as e:
         print("Error:", e)
